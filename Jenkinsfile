@@ -3,15 +3,15 @@ pipeline {
 
     environment {
         IMAGE = "employee-app"
-        REGISTRY = "guptalakshya"  // Set your Docker registry username here 
+        REGISTRY = "guptalakshya" 
         IMAGE_TAG = "${REGISTRY}/${IMAGE}:${env.BUILD_NUMBER}"
     }
 
     stages {
         stage('Clone') {
-            steps {
-                git 'https://github.com/lakshyagupta8383/employee-mgmt.git' 
-            }
+    steps {
+        git credentialsId: 'githubcreds', url: 'https://github.com/lakshyagupta8383/employee-mgmt.git'
+    }
         }
         stage('Build') {
             steps {
@@ -21,7 +21,7 @@ pipeline {
         stage('Test') {
             steps {
                 sh 'mvn test'
-                junit '**/target/surefire-reports/*.xml' // Publish JUnit test reports
+                junit '**/target/surefire-reports/*.xml'
             }
         }
         stage('Docker Build & Push') {
