@@ -1,0 +1,19 @@
+- name: Deploy Employee App
+  hosts: local
+  become: yes
+
+  tasks:
+    - name: Stop previous container
+      docker_container:
+        name: employee-app
+        state: absent
+        force_kill: true
+
+    - name: Run Docker container
+      docker_container:
+        name: employee-app
+        image: employee-app
+        state: started
+        restart_policy: always
+        ports:
+          - "8080:8080"
