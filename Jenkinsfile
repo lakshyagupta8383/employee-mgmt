@@ -1,49 +1,41 @@
 pipeline {
-    agent none
+    agent any
 
     environment {
         IMAGE = "employee-app"
         REGISTRY = "guptalakshya"
-        IMAGE_TAG = "${REGISTRY}/${IMAGE}:${env.BUILD_NUMBER}"
+        IMAGE_TAG = "${REGISTRY}/${IMAGE}:${BUILD_NUMBER}"
     }
 
     stages {
-        stage('Clone') {
-            agent { label 'master' } // or whichever node can access Git
+
+        stage('Clone Repository') {
             steps {
                 git credentialsId: 'githubcreds', url: 'https://github.com/lakshyagupta8383/employee-mgmt.git'
             }
         }
 
-        stage('Build') {
-            agent {
-                docker {
-                    image 'maven:3.8.8-openjdk-17'
-                    args '-v $HOME/.m2:/root/.m2' // cache dependencies
-                }
-            }
+        stage('Build with Maven') {
             steps {
                 sh 'mvn clean install'
             }
         }
 
-        stage('Test') {
-            agent {
-                docker {
-                    image 'maven:3.8.8-openjdk-17'
-                }
-            }
+        stage('Run Tests') {
             steps {
                 sh 'mvn test'
-                junit '**/target/surefire-reports/*.xml'
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
             }
         }
 
         stage('Docker Build & Push') {
-            agent { label 'docker' } // or 'master' if Docker is on that node
             steps {
                 script {
-                    docker.withRegistry('', 'dockerhubcredentialsid') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhubcredentialsid') {
                         sh "docker build -t ${IMAGE_TAG} ."
                         sh "docker push ${IMAGE_TAG}"
                     }
@@ -52,10 +44,18 @@ pipeline {
         }
 
         stage('Deploy via Ansible') {
-            agent { label 'ansible' } // a node with Ansible installed
             steps {
                 sh 'ansible-playbook -i ansible/hosts ansible/deploy.yml'
             }
+        }
+    }
+
+    post {
+        failure {
+            echo "❌ Build failed!"
+        }
+        success {
+            echo "✅ Build and deployment succeeded!"
         }
     }
 }
