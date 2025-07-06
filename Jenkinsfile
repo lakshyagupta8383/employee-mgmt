@@ -2,20 +2,17 @@ pipeline {
     agent any
 
     environment {
-        IMAGE = "employee-app"
-        REGISTRY = "guptalakshya"
-        IMAGE_TAG = "${REGISTRY}/${IMAGE}:${BUILD_NUMBER}"
+        IMAGE_NAME = "employee-mgmt"
     }
 
     stages {
-
-        stage('Clone Repository') {
+        stage('Checkout') {
             steps {
-                git credentialsId: 'githubcreds', url: 'https://github.com/lakshyagupta8383/employee-mgmt.git'
+                git credentialsId: 'githubcreds', url: 'https://github.com/lakshyagupta8383/employee-mgmt.git', branch: 'master'
             }
         }
 
-        stage('Build with Maven') {
+        stage('Build') {
             steps {
                 sh 'mvn clean install'
             }
@@ -34,18 +31,31 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhubcredentialsid') {
-                        sh "docker build -t ${IMAGE_TAG} ."
-                        sh "docker push ${IMAGE_TAG}"
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhubcredentialsid',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    script {
+                        def image = "${DOCKER_USER}/${IMAGE_NAME}:latest"
+                        sh """
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                            docker build -t $image .
+                            docker push $image
+                            docker logout
+                        """
                     }
                 }
             }
         }
 
         stage('Deploy via Ansible') {
+            when {
+                expression { return false } // Change to true to enable
+            }
             steps {
-                sh 'ansible-playbook -i ansible/hosts ansible/deploy.yml'
+                echo 'Deploying using Ansible...'
+                // sh 'ansible-playbook deploy.yml'
             }
         }
     }
@@ -55,7 +65,7 @@ pipeline {
             echo "❌ Build failed!"
         }
         success {
-            echo "✅ Build and deployment succeeded!"
+            echo "✅ Build succeeded!"
         }
     }
 }
